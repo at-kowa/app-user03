@@ -1,6 +1,6 @@
 # 情シス質問箱アプリ 要件定義書（技術検証版）
 
-- 版：0.4
+- 版：0.5
 - 作成日：2026-10-21
 - 想定読者：開発担当（Claude Code）、開発者本人、情報システム部
 - 関連資料：ペルソナ定義（claude/personas.md）
@@ -13,6 +13,7 @@
 | 0.2 | 2026-10-21 | supabase・GitHub・Vercel を使う構成に変更。モック段階を廃止 |
 | 0.3 | 2026-10-21 | 要約・検証計画・機能の優先度を追加。検証は情シス内・テスト投稿のみに変更。受付一覧の自動更新を追加。集計・CSV・マスタ管理画面などを「今回はやらない」に変更 |
 | 0.4 | 2026-10-21 | 検証の意味を「業務での効果」から「この構成で Claude Code を使ってアプリを作り公開できるか（技術検証）」に変更。業務上の目的・課題を削除。検証計画を技術要素の確認表に変更。成功の判定を受け入れ基準に決定 |
+| 0.5 | 2026-10-21 | npm が Windows の証明書を使う設定（`NODE_USE_SYSTEM_CA=1`）で使えると判明したため、画面の構成を「ビルド不要の静的ファイル」から「Next.js ＋ shadcn/ui」に変更（4章）。画面を架空データで先に作る段階（段階0）を追加（2.2・16.4）。接続先の受け渡しを `config.js` から環境変数に変更（4.4・14章・17章）。Vercel Hobby では本番 URL を保護できない点と、その扱いを追加（5章・19章） |
 
 ---
 
@@ -24,7 +25,7 @@
 | 題材 | 質問・要望・不具合連絡を受け付け、情シスが回答し、FAQとして公開する Web アプリ |
 | 検証の範囲 | 開発＋公開（Vercel で動くところまで）。業務での効果や運用・保守は検証しない |
 | 成功の判定 | 17章の受け入れ基準をすべて満たしたら「この構成で作れる」と判定する |
-| 構成 | 画面：Vercel（Hobby）／ログイン・DB・画像：supabase（チーム共有プロジェクトに間借り）／コード：GitHub |
+| 構成 | 画面：Next.js ＋ shadcn/ui を Vercel（Hobby）で公開／ログイン・DB・画像：supabase（チーム共有プロジェクトに間借り）／コード：GitHub |
 | 今回作る範囲 | 投稿・回答・FAQ・未読・受付一覧の自動更新を「必須」とし、集計・CSV・マスタ管理画面などは作らない（7章） |
 | 開発の着手 | 開発者本人の許可（「いいよ」）を得てから |
 
@@ -50,7 +51,7 @@
 ### 2.2 対象
 
 - 7章の「必須」機能の画面、ログイン、データ保存（supabase）、添付画像の保存、Vercel への公開
-- 最初から supabase の実際のデータベースで作る（モック実装は作らない）
+- 画面は先に架空データで作り（段階0）、データアクセス（Repository）を差し替えて supabase の実際のデータベースにつなぐ。架空データはコードの中だけに置き、データベースには入れない
 
 ### 2.3 対象外
 
@@ -86,7 +87,8 @@
 | ソース管理と変更の流れ | GitHub | ブランチ→PR→本人のマージ、の流れで開発を進められる | 運用 1 |
 | DB の変更 | SQL ファイル＋SQL Editor | migration の SQL を Claude が作り、本人が適用する流れで DB を作れる | 運用 2 |
 | 公開 | Vercel | 接続キーを commit せずに、環境変数から設定して公開できる | 公開 1〜2 |
-| 社内環境の制約 | － | npm・supabase CLI が使えない PC でも開発・公開できる | 公開 1 |
+| 画面の構成 | Next.js ＋ shadcn/ui | npm でパッケージを取り込み、Vercel でビルド・公開できる | 公開 1 |
+| 社内環境の制約 | － | npm は Windows の証明書を使う設定（`NODE_USE_SYSTEM_CA=1`）で使う。supabase CLI は使えないため、DB の変更は SQL Editor で適用する | 公開 1 |
 
 ### 3.3 検証しないこと
 
@@ -102,9 +104,9 @@
 [利用者：Edge（Windows PC／iPad）]
         │  HTTPS
         ▼
-[Vercel（Hobby）] … 画面ファイル（HTML／CSS／JS）を配信するだけ。データは置かない
+[Vercel（Hobby）] … Next.js でビルドした画面を配信する。データは置かない
         │
-        │  supabase-js（ブラウザから直接）
+        │  supabase-js（ブラウザから直接。npm で取り込みビルドに含める）
         ▼
 [supabase（チーム共有プロジェクトに間借り）]
    ├─ Auth      … ログイン（社員番号＋パスワード）
@@ -120,44 +122,52 @@
 |---|---|---|
 | GitHub | ソースコード管理、変更の確認（プルリクエスト） | 会社の Organization（at-kowa）のリポジトリ `Q-A` |
 | supabase | ログイン、データベース、添付画像の保存 | チームのテスト用プロジェクトに間借り。作るものはすべて `qbox_`（Storage は `qbox-`）で始める |
-| Vercel | 画面ファイルの公開 | 会社メールで登録した無償プラン（Hobby）。試作・検証目的に限る |
+| Vercel | Next.js のビルドと画面の公開 | 会社メールで登録した無償プラン（Hobby）。試作・検証目的に限る |
 
 ### 4.3 環境
 
 | 環境 | 用途 | URL・場所 |
 |---|---|---|
-| ローカル | 開発中の動作確認 | PC 上で HTML を開く（簡易サーバで起動） |
-| プレビュー | プルリクエストごとの確認 | Vercel が PR ごとに自動で作る URL |
+| ローカル | 開発中の動作確認 | `npm run dev` で起動し、Edge で http://localhost:3000 を開く |
+| プレビュー | プルリクエストごとの確認 | Vercel が PR ごとに自動で作る URL（Vercel Authentication で保護） |
 | 検証公開 | 公開できたことの確認に使う画面 | Vercel の本番 URL（main ブランチ） |
 
 - データベースは3つの環境で同じ supabase（共有プロジェクト）を使う
 - 検証に協力する人以外には URL を案内しない
+- Hobby では本番 URL にアクセス制限をかけられない（プレビューのみ保護できる）。そのため、**main へのマージは supabase のログインと RLS をつないでから**とし、それまではプレビュー URL だけで確認する（5章）
 
 ### 4.4 フロントエンドの作り
 
-- **ビルド不要の静的ファイル**（HTML／CSS／JavaScript）で作る。この PC は npm が使えないため、npm に頼らない
-- supabase との通信は supabase-js を使う。CDN から**バージョンを固定して**読み込む
-- 接続先（supabase の URL と公開用キー）は `config.js` に書き、**GitHub には commit しない**。Vercel では環境変数から `config.js` を生成する（qbox-test の仕組みを流用）
-- 画面（View）、状態管理、データアクセス（Repository）の3層に分け、supabase を呼ぶ処理は Repository にまとめる
+- **Next.js（App Router）＋ TypeScript ＋ shadcn/ui ＋ Tailwind CSS** で作る
+- npm は Windows の証明書を使う設定（ユーザー環境変数 `NODE_USE_SYSTEM_CA=1`）で使う。パッケージのバージョンは `package-lock.json` で固定する
+- shadcn/ui の部品は `src/components/ui/` にコードとして取り込み、iPad で押しやすいよう高さを 44px 以上に調整して使う
+- 外部の CDN や Web フォント（Google Fonts など）は読み込まない。文字は Windows・iPad の日本語フォントを使う
+- 画面はブラウザ側（Client Component）で動かし、supabase との通信は supabase-js（npm で取り込む）でブラウザから直接行う。サーバー側の処理（API Routes・Server Actions）は使わない
+- 接続先（supabase の URL と公開用キー）は環境変数 `NEXT_PUBLIC_SUPABASE_URL`・`NEXT_PUBLIC_SUPABASE_ANON_KEY` で渡す。ローカルでは `.env.local` に書き、**GitHub には commit しない**。Vercel では本人が管理画面で環境変数を登録する
+- 画面（`src/app/`）、状態管理（`src/lib/session.tsx`）、データアクセス（`src/lib/repository.ts`）の3層に分け、supabase を呼ぶ処理は Repository にまとめる
+- 段階0では Repository が架空データ（`src/lib/mock-data.ts`）を使う。supabase につなぐときは Repository の中身だけを差し替え、画面は変えない
 - 処理はすべて非同期（async/await）で書く
 
 ### 4.5 フォルダ構成（案）
 
 ```
-Q-A/
-├─ app/
-│   ├─ index.html          … 画面（シングルページ）
-│   ├─ css/
-│   ├─ js/
-│   │   ├─ views/          … 画面ごとの処理
-│   │   ├─ repositories/   … supabase を呼ぶ処理
-│   │   └─ main.js
-│   └─ config.js           … 接続先（commit しない）
+<リポジトリ>/
+├─ src/
+│   ├─ app/                … 画面（URL ごとのフォルダ。S-01〜S-12）
+│   ├─ components/
+│   │   ├─ ui/             … shadcn/ui の部品
+│   │   └─ *.tsx           … 画面で共通に使う部品
+│   └─ lib/
+│       ├─ repository.ts   … データアクセス（supabase を呼ぶ処理）
+│       ├─ mock-data.ts    … 段階0の架空データ
+│       ├─ session.tsx     … ログイン状態・自動ログアウト
+│       └─ supabase.ts     … supabase-js の接続（段階1で追加）
 ├─ supabase/
 │   ├─ migrations/         … DB 変更の SQL（日付順のファイル）
 │   └─ seed/               … テストデータ・マスタの SQL
-├─ scripts/write-config.mjs … Vercel で config.js を作る
-├─ vercel.json
+├─ docs/requirements.md    … この要件定義書
+├─ .env.local              … 接続先（commit しない）
+├─ package.json・package-lock.json
 ├─ CLAUDE.md               … このアプリ固有のルール
 └─ README.md               … 構成・起動方法・保守手順
 ```
@@ -165,9 +175,10 @@ Q-A/
 ## 5. 社内ルール・制約
 
 - 動作対象ブラウザは **Microsoft Edge**（Windows PC・iPad）。iPad は縦・横どちらでも使えること
-- 通信先は **supabase と Vercel のみ**。アクセス解析タグ、自動メール・Webhook 送信、その他の外部 API は使わない（CDN は supabase-js の読み込みのみ）
+- 利用者のブラウザの通信先は **supabase と Vercel のみ**。アクセス解析タグ、自動メール・Webhook 送信、外部の CDN・Web フォント、その他の外部 API は使わない（Vercel の Web Analytics・Speed Insights も有効にしない）
 - **アクセス制限なしで公開しない**。ログインしないとデータを一切読めない設計にする
 - Vercel Hobby は試作・検証用。業務の本番運用はしない
+- Hobby では本番 URL を Vercel Authentication で保護できないため、本番 URL には**ログインと RLS をつないだ版だけ**を公開する。架空データの段階（段階0）は main にマージせず、保護されたプレビュー URL で確認する
 - 共有プロジェクトでは、`qbox_` 以外のテーブルやプロジェクト全体の設定（Auth の設定を含む）に触れない
 - テスト投稿・添付にも**個人情報（パスワード・口座番号・マイナンバー等）、図面、取引先・顧客から預かった資料**を入れない。画面に注意書きを出す
 - 接続キー・パスワードはコードやチャットに書かない。`service_role`（secret）キーは使わない
@@ -418,7 +429,8 @@ Q-A/
 - 画面に表示する際は入力値をエスケープする（XSS対策）
 - 権限のない画面へURLを直接入力しても表示しない。ただし本当の防御はRLSで行う（画面の制御だけに頼らない）
 - フロントエンドでは公開用（anon／publishable）キーだけを使う
-- 接続キー・`.env`・`config.js` は commit しない。Vercel の環境変数は本人が管理画面で登録する
+- 接続キー・`.env.local` などの `.env` ファイルは commit しない（`.gitignore` で除外する）。Vercel の環境変数は本人が管理画面で登録する
+- 環境変数のうち `NEXT_PUBLIC_` で始まるものはブラウザに渡るため、公開してよい値（supabase の URL と anon／publishable キー）だけにする
 - リポジトリは Public のため、社内の情報（拠点名・利用者名などの実データ、社内URL）をコードやテストデータに書かない。マスタの実データは supabase 上にだけ登録する
 
 ## 15. 非機能要件
@@ -459,13 +471,16 @@ Q-A/
 
 | 段階 | 内容 | 優先度 |
 |---|---|---|
-| 1 | 土台：フォルダ構成、ログイン・ログアウト・パスワード変更、`qbox_users`・マスタのテーブルとRLS、マスタ・テストデータのSQL | 必須 |
-| 2 | 投稿：新規投稿（添付画像を含む）、投稿完了、自分の投稿一覧、投稿詳細（投稿者用） | 必須 |
-| 3 | 対応：受付一覧（自動更新を含む）、投稿詳細（対応用）、ステータス、コメント・内部メモ、回答、未読バッジ、ホーム | 必須 |
-| 4 | FAQ：FAQ公開編集、FAQ一覧・検索・詳細、README | 必須 |
+| 0 | 画面の試作：Next.js ＋ shadcn/ui の土台、必須画面 S-01〜S-12 を架空データで作る | 必須 |
+| 1 | 土台：supabase-js の接続、ログイン・ログアウト・パスワード変更を supabase Auth に差し替え、`qbox_users`・マスタのテーブルとRLS、マスタ・テストデータのSQL | 必須 |
+| 2 | 投稿：Repository の投稿まわり（新規投稿・添付画像・投稿完了・自分の投稿一覧・投稿詳細（投稿者用））を supabase に差し替え | 必須 |
+| 3 | 対応：Repository の対応まわり（受付一覧の自動更新・投稿詳細（対応用）・ステータス・コメント・内部メモ・回答・未読バッジ・ホーム）を supabase に差し替え | 必須 |
+| 4 | FAQ：Repository の FAQ まわり（公開編集・一覧・検索・詳細）を supabase に差し替え、README の保守手順 | 必須 |
 | 5 | 追加：7章の「あれば良い」から本人と相談して選ぶ | あれば良い |
 
-- 開発の着手は本人の許可（「いいよ」）を得てから。許可後は段階1〜4を順に進める
+- 開発の着手は本人の許可（「いいよ」）を得てから。許可後は段階0〜4を順に進める
+- DB の SQL（テーブル・RLS・DB関数）は、段階ごとに分けず、まとめて1つのプルリクエストにしてよい
+- 段階0は架空データでログインの確認もないため、main にはマージせず、プレビュー URL で確認する。段階1のブランチは段階0のブランチから作り、**段階0と段階1をまとめて main にマージする**（5章）
 
 ## 17. 受け入れ基準（検証の成功判定）
 
@@ -484,8 +499,8 @@ Q-A/
 | 運用 | 1 | すべての変更が作業ブランチ→プルリクエスト→本人のマージで main に入っている |
 | 運用 | 2 | DB の構成がすべて `supabase/migrations/` の SQL ファイルとして残っている |
 | 公開 | 1 | Vercel の検証公開URLで、上の機能がすべて動く |
-| 公開 | 2 | GitHub に `config.js`・接続キーが含まれていない |
-| 公開 | 3 | 通信先が supabase・Vercel・supabase-js の CDN のみである（開発者ツールのネットワークタブで確認する） |
+| 公開 | 2 | GitHub に `.env` ファイル・接続キーが含まれていない |
+| 公開 | 3 | 通信先が supabase・Vercel のみである（開発者ツールのネットワークタブで確認する） |
 
 ## 18. 本番化する場合に必要なこと（今回は対象外）
 
@@ -516,8 +531,14 @@ Q-A/
 | 初期パスワード | 本人が対面で伝え、初回変更を必須にする |
 | 利用者登録 | 手入力（一括登録は作らない） |
 | 検証後のデータ | そのまま残す |
+| 画面の構成（v0.5） | Next.js（App Router）＋ shadcn/ui。npm は `NODE_USE_SYSTEM_CA=1` で使う |
+| 開発の進め方（v0.5） | 画面を架空データで先に作り（段階0）、Repository を差し替えて supabase につなぐ |
+| 接続先の受け渡し（v0.5） | 環境変数（`NEXT_PUBLIC_SUPABASE_URL`・`NEXT_PUBLIC_SUPABASE_ANON_KEY`）。`config.js` は使わない |
+| 本番 URL の扱い（v0.5） | Hobby では本番 URL を保護できないため、ログインと RLS をつないだ版だけを main にマージする |
 
 ### 19.2 未決事項
 
 - パスワード初期化の具体的な手順（実装時に確認）
 - 共有プロジェクトのプランと容量（停止条件の有無）
+- リポジトリ名：4章では `at-kowa/Q-A` としているが、実際の開発は `at-kowa/app-user03` で行っている。どちらを正とするか
+- Vercel プロジェクトを GitHub の at-kowa の組織に連携できるか（Vercel for GitHub の取り付けに組織の管理者の承認が要るか）
