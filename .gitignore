@@ -1,0 +1,4 @@
+# 接続先・鍵は commit しない
+app/config.js
+.env
+.env.*
